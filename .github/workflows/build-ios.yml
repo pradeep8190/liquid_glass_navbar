@@ -18,14 +18,14 @@ jobs:
       - name: Generate Xcode Project
         run: xcodegen generate
 
-      - name: Build Archive
+      - name: Build Application
         run: |
           xcodebuild -project LiquidGlassNavBar.xcodeproj \
             -scheme LiquidGlassNavBar \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath build/LiquidGlassNavBar.xcarchive \
-            archive \
+            -derivedDataPath build \
+            build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
@@ -33,7 +33,7 @@ jobs:
       - name: Package into IPA
         run: |
           mkdir -p Payload
-          cp -r build/LiquidGlassNavBar.xcarchive/Products/Applications/LiquidGlassNavBar.app Payload/
+          cp -r build/Build/Products/Release-iphoneos/LiquidGlassNavBar.app Payload/
           zip -r LiquidGlassNavBar.ipa Payload
 
       - name: Upload IPA Artifact
