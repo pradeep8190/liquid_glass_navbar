@@ -13,6 +13,10 @@ targets:
       - LiquidGlassApp.swift
     info:
       path: Info.plist
+    scheme:
+      build:
+        targets:
+          LiquidGlassNavBar: all
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.liquidglass.navbar

@@ -21,7 +21,7 @@ jobs:
       - name: Build Application
         run: |
           xcodebuild -project LiquidGlassNavBar.xcodeproj \
-            -scheme LiquidGlassNavBar \
+            -target LiquidGlassNavBar \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
@@ -29,12 +29,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            build 2>&1 | tee build.log || { tail -n 80 build.log; exit 1; }
+            build
 
       - name: Package into IPA
         run: |
+          APP_PATH=$(find build -name "LiquidGlassNavBar.app" -type d | head -n 1)
+          echo "Found app at $APP_PATH"
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/LiquidGlassNavBar.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r LiquidGlassNavBar.ipa Payload
 
       - name: Upload IPA Artifact
