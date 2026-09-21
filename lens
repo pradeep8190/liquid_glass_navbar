@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquid Glass Optical Refraction & Hydrodynamic Fluid Physics Demo</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 30%, #ffffff 0%, #f1f5f9 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      color: #0f172a;
+    }
+
+    /* Header Panel */
+    .header-panel {
+      position: absolute;
+      top: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 400;
+      max-width: 600px;
+    }
+
+    /* Interactive Stage */
+    .demo-stage {
+      position: relative;
+      width: 800px;
+      height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+      border-radius: 24px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
+      background: #ffffff;
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .demo-stage:active {
+      cursor: grabbing;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      pointer-events: none;
+    }
+
+    /* Telemetry & Controls Panel */
+    .bottom-panel {
+      position: absolute;
+      bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    .telemetry-hud {
+      display: flex;
+      gap: 14px;
+      padding: 10px 18px;
+      background: rgba(255, 255, 255, 0.90);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 14px;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+
+    .hud-stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 80px;
+    }
+
+    .hud-label {
+      font-size: 9.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    .hud-value {
+      font-size: 13.5px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .hud-unit {
+      font-size: 10px;
+      font-weight: 500;
+      color: #64748b;
+    }
+
+    .hud-divider {
+      width: 1px;
+      height: 24px;
+      background-color: #e2e8f0;
+      align-self: center;
+    }
+
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(226, 232, 240, 0.6);
+      font-size: 11px;
+      color: #475569;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .control-item input[type="range"] {
+      width: 70px;
+      height: 4px;
+      accent-color: #0f172a;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-panel">
+    <h1 class="title">Liquid Glass Optical Refraction & Hydrodynamic Physics</h1>
+    <p class="subtitle">Continuous Young-Laplace convex meniscus with true Snell's Law vector ray refraction, Cauchy spectral chromatic dispersion, and volume-conserving fluid elasticity.</p>
+  </div>
+
+  <div class="demo-stage" id="demoStage">
+    <canvas id="demoCanvas"></canvas>
+  </div>
+
+  <div class="bottom-panel">
+    <!-- Real-Time Physics Telemetry HUD -->
+    <div class="telemetry-hud">
+      <div class="hud-stat">
+        <span class="hud-label">Velocity ($v_x$)</span>
+        <span class="hud-value" id="valVelocity">0.0 <span class="hud-unit">px/s</span></span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-stat">
+        <span class="hud-label">Stretch ($S_x$)</span>
+        <span class="hud-value" id="valStretch">1.000<span class="hud-unit">×</span></span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-stat">
+        <span class="hud-label">Thinning ($S_y$)</span>
+        <span class="hud-value" id="valThinning">1.000<span class="hud-unit">×</span></span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-stat">
+        <span class="hud-label">Hydraulic Splash</span>
+        <span class="hud-value" id="valSplash">0.00 <span class="hud-unit">px</span></span>
+      </div>
+      <div class="hud-divider"></div>
+      <div class="hud-stat">
+        <span class="hud-label">Refraction Mode</span>
+        <span class="hud-value" style="color: #2563eb;">Full 3D Snell</span>
+      </div>
+    </div>
+
+    <!-- Live Tuning Controls -->
+    <div class="controls-bar">
+      <div class="control-item">
+        <label>Dome Height ($H$):</label>
+        <input type="range" id="ctrlHeight" min="2" max="25" step="0.5" value="12.0">
+        <span id="txtHeight">12.0px</span>
+      </div>
+      <div class="control-item">
+        <label>Refraction Index ($IOR$):</label>
+        <input type="range" id="ctrlIor" min="1.05" max="1.8" step="0.01" value="1.45">
+        <span id="txtIor">1.45</span>
+      </div>
+      <div class="control-item">
+        <label>Dispersion:</label>
+        <input type="range" id="ctrlDisp" min="0.0" max="0.10" step="0.005" value="0.035">
+        <span id="txtDisp">0.035</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * GLSL Vertex Shader
+     */
+    const vsSource = `
+      attribute vec2 a_position;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = (a_position + 1.0) * 0.5;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+
+    /**
+     * GLSL Fragment Shader: True First-Principles 3D Convex Optical Ray-Tracer
+     * - Continuous Young-Laplace Meniscus Surface
+     * - Vector Snell's Law Refraction
+     * - Cauchy 6-Band Spectral Chromatic Dispersion
+     * - Substrate Ray-Plane Interception
+     * - Schlick Fresnel Reflection & Specular Sheen
+     */
+    const fsSource = `
+      precision highp float;
+      varying vec2 v_uv;
+
+      uniform sampler2D u_background;
+      uniform vec2 u_resolution;
+      uniform vec2 u_lensPos;         // Center in device pixels (X, Y)
+      uniform vec2 u_lensHalfSize;    // Dynamic half-size (Wx, Wy) from volume conservation
+      uniform float u_lensRadius;     // Dynamic corner radius in device pixels
+      uniform vec2 u_velocity;        // Current fluid velocity (X, Y)
+      uniform float u_fluidWave;      // Dynamic fluid surface wave oscillation amplitude
+      uniform float u_splashHeight;   // Hydraulic braking splash wave surge
+      uniform float u_ior;            // Base Index of Refraction (~1.49 Acrylic/Water)
+      uniform float u_dispersion;     // Cauchy Abbe Chromatic Dispersion (~0.045)
+      uniform float u_lensHeight;     // Dynamic Meniscus Dome Height in device pixels
+      uniform float u_dpr;            // Device Pixel Ratio
+
+      // 6-Band Normalized Spectral Weights for Visible Wavelengths (700nm to 405nm)
+      vec3 getSpectralWeight(int i) {
+        if (i == 0) return vec3(0.40, 0.00, 0.00); // Deep Red (~700nm)
+        if (i == 1) return vec3(0.35, 0.26, 0.00); // Amber / Yellow (~590nm)
+        if (i == 2) return vec3(0.00, 0.40, 0.04); // Green (~535nm)
+        if (i == 3) return vec3(0.00, 0.26, 0.28); // Cyan (~490nm)
+        if (i == 4) return vec3(0.04, 0.08, 0.40); // Blue (~445nm)
+        return vec3(0.21, 0.00, 0.28);              // Violet (~405nm)
+      }
+
+      // Analytical 2D Signed Distance Field for Rounded Pill Capsule
+      float sdRoundedBox(vec2 p, vec2 b, float r) {
+        vec2 q = abs(p) - b + vec2(r);
+        return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+      }
+
+      // Continuous 3D Surface Height Function across the whole droplet lens
+      float getLensSurfaceHeight(vec2 p, vec2 halfSize, float radius, float maxH, float splashH, float wave) {
+        float d = sdRoundedBox(p, halfSize, radius);
+        if (d > 0.0) return 0.0;
+
+        float distInside = -d;
+
+        // 1. Edge Meniscus Bevel Blend (Young-Laplace rim profile)
+        float bevelWidth = 16.0 * u_dpr;
+        float edgeFactor = smoothstep(0.0, bevelWidth, distInside);
+
+        // 2. Normalized 2D Radial Distance for Global Convex Dome Curvature
+        vec2 normP = clamp(p / halfSize, vec2(-1.0), vec2(1.0));
+        float rho = length(normP);
+        
+        // Soft Parabolic Curve (smooth and gentle) instead of sharp spherical cap
+        float domeProfile = 1.0 - (rho * rho * 0.70);
+
+        // 3. Dynamic Fluid Surface Ripple Wave
+        float ripple = sin(p.x * 0.05 - u_velocity.x * 0.01) * cos(p.y * 0.08) * wave * (1.0 - edgeFactor);
+
+        float totalH = (maxH + splashH) * domeProfile * edgeFactor + ripple * u_dpr;
+        return max(0.0, totalH);
+      }
+
+      void main() {
+        vec2 pixelCoord = v_uv * u_resolution;
+        vec2 p = pixelCoord - u_lensPos;
+
+        // Analytical Distance to Fluid Droplet Boundary
+        float d = sdRoundedBox(p, u_lensHalfSize, u_lensRadius);
+
+        // --- OUTSIDE THE FLUID DROPLET ---
+        if (d > 0.0) {
+          vec3 bg = texture2D(u_background, v_uv).rgb;
+
+          // Physics Grounding Contact Shadow & Ambient Occlusion
+          vec2 shadowOffset = vec2(0.4 * u_dpr, -2.5 * u_dpr);
+          float dShadow = sdRoundedBox(p - shadowOffset, u_lensHalfSize, u_lensRadius);
+          float shadowDist = max(0.0, dShadow) / u_dpr;
+
+          float contactAO = exp(-shadowDist * 0.14) * 0.052;
+          float penumbra = exp(-shadowDist * 0.04) * 0.026;
+          float totalShadow = contactAO + penumbra;
+
+          gl_FragColor = vec4(bg * (1.0 - totalShadow), 1.0);
+          return;
+        }
+
+        // --- INSIDE THE FLUID DROPLET ---
+        float distInside = -d;
+
+        // 1. Calculate 3D Surface Height and Analytical Surface Normal Field (∇h)
+        float eps = 1.0 * u_dpr;
+        float hCenter = getLensSurfaceHeight(p, u_lensHalfSize, u_lensRadius, u_lensHeight, u_splashHeight, u_fluidWave);
+        float hRight  = getLensSurfaceHeight(p + vec2(eps, 0.0), u_lensHalfSize, u_lensRadius, u_lensHeight, u_splashHeight, u_fluidWave);
+        float hLeft   = getLensSurfaceHeight(p - vec2(eps, 0.0), u_lensHalfSize, u_lensRadius, u_lensHeight, u_splashHeight, u_fluidWave);
+        float hUp     = getLensSurfaceHeight(p + vec2(0.0, eps), u_lensHalfSize, u_lensRadius, u_lensHeight, u_splashHeight, u_fluidWave);
+        float hDown   = getLensSurfaceHeight(p - vec2(0.0, eps), u_lensHalfSize, u_lensRadius, u_lensHeight, u_splashHeight, u_fluidWave);
+
+        float dh_dx = (hRight - hLeft) / (2.0 * eps);
+        float dh_dy = (hUp - hDown) / (2.0 * eps);
+
+        // Dynamic fluid velocity shear tilt
+        vec2 velocityShear = clamp(-u_velocity * 0.0003, vec2(-0.25), vec2(0.25));
+
+        // True 3D Surface Normal: N = normalize(-∂h/∂x, -∂h/∂y, 1.0)
+        vec3 normal = normalize(vec3(-dh_dx + velocityShear.x, -dh_dy + velocityShear.y, 1.0));
+        vec3 incidentRay = vec3(0.0, 0.0, -1.0);
+        vec3 viewDir = vec3(0.0, 0.0, 1.0);
+
+        // 2. Optical Path Depth (Droplet thickness + Substrate air/liquid gap)
+        // Restored optical depth to make the refraction curve clearly visible and pronounced
+        float totalDepth = hCenter + (18.0 * u_dpr);
+
+        // 3. Vector Snell's Law Refraction + Cauchy 6-Band Spectral Dispersion
+        vec3 totalRefractedColor = vec3(0.0);
+
+        for (int i = 0; i < 6; i++) {
+          float fi = (float(i) - 2.5) / 2.5; // -1.0 to +1.0 across visible spectrum
+          float lambdaIOR = u_ior + fi * u_dispersion;
+
+          // Vector Snell-Descartes Refraction: T = refract(I, N, 1/n)
+          vec3 refractedRay = refract(incidentRay, normal, 1.0 / lambdaIOR);
+
+          // Substrate Ray-Plane Intersection (Exact Physical UV Displacement)
+          vec2 rayOffset = (refractedRay.xy / abs(refractedRay.z + 1e-4)) * (totalDepth / u_resolution);
+          vec2 sampleUV = v_uv - rayOffset;
+
+          vec3 spectralSample = texture2D(u_background, sampleUV).rgb;
+          vec3 weight = getSpectralWeight(i);
+          totalRefractedColor += spectralSample * weight;
+        }
+
+        // Subpixel Antialiasing Feathering at boundary (softer edge)
+        float rimAntialias = smoothstep(0.0, 2.5 * u_dpr, distInside);
+        totalRefractedColor *= mix(0.97, 1.0, rimAntialias);
+
+        // 4. Schlick Fresnel Grazing Reflection
+        float cosTheta = max(0.0, dot(normal, viewDir));
+        float R0 = pow((u_ior - 1.0) / (u_ior + 1.0), 2.0); // Reflection at normal incidence
+        float fresnel = R0 + (1.0 - R0) * pow(1.0 - cosTheta, 4.0);
+
+        // 5. Specular Top Meniscus Crest Sheen Highlight
+        float topRimBonus = smoothstep(u_lensHalfSize.y - (10.0 * u_dpr), u_lensHalfSize.y - (1.5 * u_dpr), p.y);
+        float sheenProfile = exp(-distInside / (0.65 * u_dpr)) * topRimBonus * 0.45;
+        vec3 specularWhite = vec3(1.0, 1.0, 1.0) * sheenProfile;
+
+        // Grazing Fresnel ambient glint
+        vec3 ambientGlint = vec3(0.95, 0.98, 1.0) * fresnel * 0.25;
+
+        // Final Composite Color (Refracted Substrate with visible curved borders + Fresnel + Specular)
+        vec3 finalFluidColor = (totalRefractedColor * (1.0 - fresnel * 0.5)) + ambientGlint + specularWhite;
+
+        gl_FragColor = vec4(finalFluidColor, 1.0);
+      }
+    `;
+
+    // DOM Elements
+    const stage = document.getElementById('demoStage');
+    const canvas = document.getElementById('demoCanvas');
+    const gl = canvas.getContext('webgl', { alpha: false, antialias: true });
+
+    const valVelocity = document.getElementById('valVelocity');
+    const valStretch = document.getElementById('valStretch');
+    const valThinning = document.getElementById('valThinning');
+    const valSplash = document.getElementById('valSplash');
+
+    const ctrlHeight = document.getElementById('ctrlHeight');
+    const ctrlIor = document.getElementById('ctrlIor');
+    const ctrlDisp = document.getElementById('ctrlDisp');
+
+    const txtHeight = document.getElementById('txtHeight');
+    const txtIor = document.getElementById('txtIor');
+    const txtDisp = document.getElementById('txtDisp');
+
+    const bgCanvas = document.createElement('canvas');
+    const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+
+    // Live Parameter Listeners
+    ctrlHeight.addEventListener('input', (e) => {
+      userLensHeight = parseFloat(e.target.value);
+      txtHeight.textContent = `${userLensHeight}px`;
+    });
+    ctrlIor.addEventListener('input', (e) => {
+      userIor = parseFloat(e.target.value);
+      txtIor.textContent = userIor.toFixed(2);
+    });
+    ctrlDisp.addEventListener('input', (e) => {
+      userDispersion = parseFloat(e.target.value);
+      txtDisp.textContent = userDispersion.toFixed(3);
+    });
+
+    let userLensHeight = 12.0;
+    let userIor = 1.45;
+    let userDispersion = 0.035;
+
+    // WebGL Shader Program Setup
+    function createShader(gl, type, src) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(s));
+        gl.deleteShader(s);
+        return null;
+      }
+      return s;
+    }
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, createShader(gl, gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(prog, createShader(gl, gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(prog);
+
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(prog));
+    }
+    gl.useProgram(prog);
+
+    // Quad Buffer
+    const quadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1, -1,  1,
+      -1,  1,  1, -1,  1,  1
+    ]), gl.STATIC_DRAW);
+
+    const aPos = gl.getAttribLocation(prog, 'a_position');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    // Uniform Locations
+    const uniforms = {
+      u_background: gl.getUniformLocation(prog, 'u_background'),
+      u_resolution: gl.getUniformLocation(prog, 'u_resolution'),
+      u_lensPos: gl.getUniformLocation(prog, 'u_lensPos'),
+      u_lensHalfSize: gl.getUniformLocation(prog, 'u_lensHalfSize'),
+      u_lensRadius: gl.getUniformLocation(prog, 'u_lensRadius'),
+      u_velocity: gl.getUniformLocation(prog, 'u_velocity'),
+      u_fluidWave: gl.getUniformLocation(prog, 'u_fluidWave'),
+      u_splashHeight: gl.getUniformLocation(prog, 'u_splashHeight'),
+      u_ior: gl.getUniformLocation(prog, 'u_ior'),
+      u_dispersion: gl.getUniformLocation(prog, 'u_dispersion'),
+      u_lensHeight: gl.getUniformLocation(prog, 'u_lensHeight'),
+      u_dpr: gl.getUniformLocation(prog, 'u_dpr'),
+    };
+
+    const bgTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, bgTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    // ==========================================
+    // HYDRODYNAMIC FLUID PHYSICS STATE
+    // ==========================================
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Base Resting Geometry
+    const baseHalfW = 54.0; // CSS pixels
+    const baseHalfH = 34.0; // CSS pixels
+
+    // Fluid Position & Kinetic Variables
+    let lensX = 400;
+    let targetLensX = 400;
+    let lensVelocityX = 0.0;
+    let prevLensVelocityX = 0.0;
+    let lensAccelerationX = 0.0;
+
+    // Volume Conservation & Stretch Dynamics (Sx * Sy^2 = const)
+    let fluidStretchX = 1.0;
+    let fluidStretchY = 1.0;
+    let stretchVelocityX = 0.0;
+    let stretchVelocityY = 0.0;
+
+    // Hydraulic Braking Shockwaves & Splash Harmonics
+    let splashImpulse = 0.0;
+    let splashVelocity = 0.0;
+    let fluidWave = 0.0;
+
+    // Pointer Drag Tracking
+    let isDragging = false;
+    let pointerX = 0;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.round(stage.clientWidth * dpr);
+      const h = Math.round(stage.clientHeight * dpr);
+      canvas.width = w;
+      canvas.height = h;
+      bgCanvas.width = w;
+      bgCanvas.height = h;
+      gl.viewport(0, 0, w, h);
+    }
+
+    /**
+     * Substrate Background Renderer (The pill container + crisp borders passing underneath)
+     */
+    function drawStageBackground() {
+      const w = bgCanvas.width;
+      const h = bgCanvas.height;
+      const cy = h * 0.5;
+
+      bgCtx.fillStyle = '#ffffff';
+      bgCtx.fillRect(0, 0, w, h);
+
+      // Base Floating Pill Container (Apple HIG Style)
+      const pillW = 600 * dpr;
+      const pillH = 58 * dpr;
+      const pillR = pillH * 0.5;
+      const pillX = (w - pillW) * 0.5;
+      const pillY = cy - pillH * 0.5;
+
+      // Soft container shadow
+      bgCtx.shadowColor = 'rgba(15, 23, 42, 0.06)';
+      bgCtx.shadowBlur = 20 * dpr;
+      bgCtx.shadowOffsetY = 6 * dpr;
+
+      // Container Fill
+      const grad = bgCtx.createLinearGradient(0, pillY, 0, pillY + pillH);
+      grad.addColorStop(0, '#f8fafc');
+      grad.addColorStop(1, '#f1f5f9');
+
+      bgCtx.beginPath();
+      bgCtx.roundRect(pillX, pillY, pillW, pillH, pillR);
+      bgCtx.fillStyle = grad;
+      bgCtx.fill();
+
+      // Reset shadow for crisp borders
+      bgCtx.shadowColor = 'transparent';
+      bgCtx.shadowBlur = 0;
+      bgCtx.shadowOffsetY = 0;
+
+      // Sharp Crisp Reference Border (The exact line that will refract & bend inside the glass!)
+      bgCtx.lineWidth = 2.2 * dpr;
+      bgCtx.strokeStyle = '#0f172a';
+      bgCtx.stroke();
+
+      // Reference Grid Marks & Tab Items
+      const tabCount = 4;
+      const tabSpacing = pillW / tabCount;
+      const tabLabels = ["Home", "Search", "Alerts", "Profile"];
+
+      for (let i = 0; i < tabCount; i++) {
+        const tabCenterX = pillX + (i + 0.5) * tabSpacing;
+
+        // Vertical divider lines
+        if (i > 0) {
+          const markX = pillX + i * tabSpacing;
+          bgCtx.beginPath();
+          bgCtx.moveTo(markX, pillY + 14 * dpr);
+          bgCtx.lineTo(markX, pillY + pillH - 14 * dpr);
+          bgCtx.strokeStyle = 'rgba(148, 163, 184, 0.5)';
+          bgCtx.lineWidth = 1.4 * dpr;
+          bgCtx.stroke();
+        }
+
+        // Tab Label text
+        bgCtx.font = `600 ${12 * dpr}px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif`;
+        bgCtx.fillStyle = '#64748b';
+        bgCtx.textAlign = 'center';
+        bgCtx.textBaseline = 'middle';
+        bgCtx.fillText(tabLabels[i], tabCenterX, cy);
+      }
+
+      // Upload substrate texture to WebGL
+      gl.bindTexture(gl.TEXTURE_2D, bgTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bgCanvas);
+    }
+
+    // Pointer Event Listeners
+    stage.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      stage.setPointerCapture(e.pointerId);
+      const rect = stage.getBoundingClientRect();
+      pointerX = e.clientX - rect.left;
+      targetLensX = pointerX;
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const rect = stage.getBoundingClientRect();
+      pointerX = e.clientX - rect.left;
+      targetLensX = pointerX;
+    });
+
+    const onPointerRelease = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+
+    stage.addEventListener('pointerup', onPointerRelease);
+    stage.addEventListener('pointercancel', onPointerRelease);
+
+    /**
+     * Physics Engine Step
+     */
+    let lastTime = performance.now();
+
+    function updatePhysics(dt) {
+      // 1. Fluid Translation with Elastic Spring Kinetics
+      const springK = 380.0;
+      const springDamp = 26.0;
+      const displacement = lensX - targetLensX;
+      const springForce = -springK * displacement - springDamp * lensVelocityX;
+
+      lensVelocityX += springForce * dt;
+      lensX += lensVelocityX * dt;
+
+      // 2. Acceleration & Deceleration
+      lensAccelerationX = (lensVelocityX - prevLensVelocityX) / Math.max(dt, 0.001);
+      prevLensVelocityX = lensVelocityX;
+
+      const speed = Math.abs(lensVelocityX);
+
+      // 3. Hydrodynamic Stretch & Incompressible Volume Conservation
+      const elongation = Math.min(speed * 0.00038, 0.45);
+      const brakingCompression = Math.max(0.0, -Math.sign(lensVelocityX) * lensAccelerationX * 0.000085);
+      const targetSx = Math.max(0.72, 1.0 + elongation - brakingCompression);
+
+      // Volume conservation law: Sy = 1 / sqrt(Sx)
+      const breathingWave = Math.sin(performance.now() * 0.0035) * 0.015;
+      const targetSy = (1.0 / Math.max(0.6, Math.sqrt(targetSx))) + breathingWave;
+
+      // Fluid Elasticity Restoring Harmonic Oscillator
+      const surfaceTensionK = 340.0;
+      const fluidViscosityDamp = 22.0;
+
+      const forceX = -surfaceTensionK * (fluidStretchX - targetSx) - fluidViscosityDamp * stretchVelocityX;
+      stretchVelocityX += forceX * dt;
+      fluidStretchX += stretchVelocityX * dt;
+
+      const forceY = -surfaceTensionK * (fluidStretchY - targetSy) - fluidViscosityDamp * stretchVelocityY;
+      stretchVelocityY += forceY * dt;
+      fluidStretchY += stretchVelocityY * dt;
+
+      fluidStretchX = Math.max(0.68, Math.min(1.50, fluidStretchX));
+      fluidStretchY = Math.max(0.68, Math.min(1.45, fluidStretchY));
+
+      // 4. Hydraulic Shockwave on Deceleration
+      const isDecelerating = (lensVelocityX * lensAccelerationX < -1000.0);
+      if (isDecelerating) {
+        const shock = Math.min(Math.abs(lensAccelerationX) * 0.00018, 4.0);
+        splashVelocity += shock * 40.0 * dt;
+      }
+
+      const splashForce = -220.0 * splashImpulse - 18.0 * splashVelocity;
+      splashVelocity += splashForce * dt;
+      splashImpulse += splashVelocity * dt;
+      splashImpulse = Math.max(0.0, Math.min(5.0, splashImpulse));
+
+      fluidWave = Math.min((Math.abs(stretchVelocityX) + Math.abs(stretchVelocityY)) * 0.022, 0.22);
+    }
+
+    /**
+     * Main Render Loop
+     */
+    function render(time) {
+      const dt = Math.min((time - lastTime) * 0.001, 0.033);
+      lastTime = time;
+
+      updatePhysics(dt);
+      drawStageBackground();
+
+      // Dynamic Dimensions based on physical volume conservation
+      const currentHalfW = baseHalfW * fluidStretchX * dpr;
+      const currentHalfH = baseHalfH * fluidStretchY * dpr;
+      const currentRadius = Math.min(currentHalfW, currentHalfH);
+      const currentLensHeight = userLensHeight * (1.0 / Math.sqrt(fluidStretchX)) * dpr;
+      const currentSplash = splashImpulse * dpr;
+
+      // Render WebGL Optical Ray-Tracer
+      gl.useProgram(prog);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, bgTex);
+      gl.uniform1i(uniforms.u_background, 0);
+
+      gl.uniform2f(uniforms.u_resolution, canvas.width, canvas.height);
+      gl.uniform2f(uniforms.u_lensPos, lensX * dpr, canvas.height * 0.5);
+      gl.uniform2f(uniforms.u_lensHalfSize, currentHalfW, currentHalfH);
+      gl.uniform1f(uniforms.u_lensRadius, currentRadius);
+      gl.uniform2f(uniforms.u_velocity, lensVelocityX * dpr, 0.0);
+      gl.uniform1f(uniforms.u_fluidWave, fluidWave);
+      gl.uniform1f(uniforms.u_splashHeight, currentSplash);
+      gl.uniform1f(uniforms.u_ior, userIor);
+      gl.uniform1f(uniforms.u_dispersion, userDispersion);
+      gl.uniform1f(uniforms.u_lensHeight, currentLensHeight);
+      gl.uniform1f(uniforms.u_dpr, dpr);
+
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      // Update Telemetry HUD
+      valVelocity.innerHTML = `${lensVelocityX.toFixed(1)} <span class="hud-unit">px/s</span>`;
+      valStretch.innerHTML = `${fluidStretchX.toFixed(3)}<span class="hud-unit">×</span>`;
+      valThinning.innerHTML = `${fluidStretchY.toFixed(3)}<span class="hud-unit">×</span>`;
+      valSplash.innerHTML = `${currentSplash.toFixed(2)} <span class="hud-unit">px</span>`;
+
+      requestAnimationFrame(render);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
